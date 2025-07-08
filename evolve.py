@@ -44,7 +44,7 @@ class Evolver:
             self.start_gen = self.ckpt["gen"] + 1
             print(f"Loaded checkpoint from '{self.config.checkpoint_path}'. Resuming at {self.start_gen}.")
         else:
-            self.pop = torch.randn(self.config.pop_size, C, self.model.num_wavelet_kernels, device=self.device) #* 1e-6
+            self.pop = torch.randn(self.config.pop_size, C, self.model.num_wavelet_kernels, device=self.device) * 1e-6
             self.history = []
             self.start_gen = 1
 
@@ -91,6 +91,10 @@ class Evolver:
         # Crossover + Mutation
         gen = len(self.history)
         mut_scale_mult = self.model.mut_scale_mult.clone()
+        mut_scale_mult *= 0
+        idx = gen // 10000
+        mut_scale_mult[idx] = self.model.mut_scale_mult[idx].clone()
+
         # mut_scale_mult[(1 + gen // 10000):] = 0
 
         mut_scale_mult = (

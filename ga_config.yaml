@@ -1,5 +1,5 @@
 # Genetic algorithm hyperparameters
-  target_image    : "images/uv_face_2.jpg"
+  target_image    : "images/Checkerboard_pattern.png"
   checkpoint_path : ""
   reduce_factor   : 8
   generations     : 500000
@@ -9,5 +9,5 @@
   parent_k        : 16
   num_elites      : 1
   mut_rate        : 0.1
-  mut_scale       : 0.05
+  mut_scale       : 0.01
   analyze_every   : 1000
