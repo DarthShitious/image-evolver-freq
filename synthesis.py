@@ -82,7 +82,7 @@ class WaveletImageSynthesis(nn.Module):
         self.register_buffer('tile_centers_y', tile_centers_y)
 
         # Frequencies & wavelengths
-        self.frequencies = torch.tensor([2 ** (n / 2) for n in range(num_scales)], device=self.device)
+        self.frequencies = torch.tensor([2 ** (n / 12) for n in range(num_scales)], device=self.device)
         wavelengths = 1.0 / self.frequencies
         safe_wavelengths = wavelengths.abs().clamp(min=1e-4)
         self.register_buffer('cycles_per_pixel', 1.0 / safe_wavelengths)

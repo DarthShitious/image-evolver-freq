@@ -2,9 +2,9 @@
   target_image    : "images/Checkerboard_pattern.png"
   checkpoint_path : ""
   reduce_factor   : 8
-  generations     : 500000
+  generations     : 5000000
   spatial_depth   : 8
-  scale_depth     : 8
+  scale_depth     : 36
   pop_size        : 32
   parent_k        : 16
   num_elites      : 1

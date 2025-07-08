@@ -92,7 +92,7 @@ class Evolver:
         gen = len(self.history)
         mut_scale_mult = self.model.mut_scale_mult.clone()
         mut_scale_mult *= 0
-        idx = gen // 10000
+        idx = min(len(self.model.mut_scale_mult) - 1, gen // 10000)
         mut_scale_mult[idx] = self.model.mut_scale_mult[idx].clone()
 
         # mut_scale_mult[(1 + gen // 10000):] = 0
