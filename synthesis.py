@@ -89,7 +89,7 @@ class WaveletImageSynthesis(nn.Module):
         self.register_buffer('wavelengths', wavelengths)
 
         # Mutation rate multipliers
-        self.mut_scale_mult = torch.ones_like(safe_wavelengths) #safe_wavelengths**2
+        self.mut_scale_mult = safe_wavelengths**0.5
         # self.mut_scale_mult = (
         #     self.mut_scale_mult.repeat(2)
         #     .repeat(C, self.num_tiles_per_dim, self.num_tiles_per_dim, 1)

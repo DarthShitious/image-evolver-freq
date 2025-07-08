@@ -56,5 +56,5 @@ def pngs_to_mp4(input_dir, output_path, fps=30):
 
 if __name__ == "__main__":
 
-    frames_dir = "evolved/20250707_220016/recons/"
+    frames_dir = "evolved/20250707_224355/recons/"
     pngs_to_mp4(frames_dir, f"{frames_dir}/recons.mp4", fps=2)

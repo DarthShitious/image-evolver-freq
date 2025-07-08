@@ -49,7 +49,7 @@ class Evolver:
             self.start_gen = 1
 
         # Number of learnable parameters
-        self.num_params = self.model.num_wavelet_kernels
+        self.num_params = 3*self.model.num_wavelet_kernels
 
         # Number of pixels in target image
         self.num_pixels = C*H*W
@@ -91,7 +91,7 @@ class Evolver:
         # Crossover + Mutation
         gen = len(self.history)
         mut_scale_mult = self.model.mut_scale_mult.clone()
-        mut_scale_mult[(1 + gen // 10000):] = 0
+        # mut_scale_mult[(1 + gen // 10000):] = 0
 
         mut_scale_mult = (
             mut_scale_mult.repeat(2)
