@@ -88,6 +88,14 @@ class WaveletImageSynthesis(nn.Module):
         self.register_buffer('cycles_per_pixel', 1.0 / safe_wavelengths)
         self.register_buffer('wavelengths', wavelengths)
 
+        # Mutation rate multipliers
+        self.mut_scale_mult = torch.ones_like(safe_wavelengths) #safe_wavelengths**2
+        # self.mut_scale_mult = (
+        #     self.mut_scale_mult.repeat(2)
+        #     .repeat(C, self.num_tiles_per_dim, self.num_tiles_per_dim, 1)
+        #     .view(C, -1)
+        # )
+
         # Build wavelet basis
         S = num_tiles_per_dim
         Sd = num_scales
@@ -114,12 +122,10 @@ class WaveletImageSynthesis(nn.Module):
         # Output activation
         self.hls = HardLeakySigmoid(slope=0.01)
 
-    def num_params(self):
-        return sum(p.numel() for p in self.parameters() if p.requires_grad)
-
     # ------------------------------------------------------------------------ #
     def sawtooth_wavepacket_sine_radial(self, u, v):
-        N = 12; S = 1
+        N = 12
+        S = 1
         saw = 0
         r = torch.sqrt(u**2 + v**2)
         for n in range(1, N+1):
@@ -128,7 +134,8 @@ class WaveletImageSynthesis(nn.Module):
         return saw * env
 
     def sawtooth_wavepacket_cosine_radial(self, u, v):
-        N = 12; S = 1
+        N = 12
+        S = 1
         saw = 0
         r = torch.sqrt(u**2 + v**2)
         for n in range(1, N+1):
@@ -137,7 +144,8 @@ class WaveletImageSynthesis(nn.Module):
         return saw * env
 
     def sawtooth_wavepacket_sine_sep(self, u, v):
-        N = 8; S = 1
+        N = 1
+        S = 1
         r = torch.sqrt(u**2 + v**2)
         saw_u = saw_v = 0
         for n in range(1, N+1):
@@ -148,7 +156,8 @@ class WaveletImageSynthesis(nn.Module):
         return saw_u * saw_v * env
 
     def sawtooth_wavepacket_cosine_sep(self, u, v):
-        N = 8; S = 1
+        N = 1
+        S = 1
         r = torch.sqrt(u**2 + v**2)
         saw_u = saw_v = 0
         for n in range(1, N+1):
@@ -166,147 +175,4 @@ class WaveletImageSynthesis(nn.Module):
             coeff_norm = torch.abs(wavelet_coeffs).sum(dim=2).view(B, C, 1, 1)
             synthesized_image = self.hls(synthesized_image)
         return synthesized_image
-
-
-
-
-
-
-
-
-
-
-
-
-
-# class WaveletImageSynthesis(nn.Module):
-#     def __init__(
-#         self,
-#         target_shape,
-#         spatial_depth,
-#         scale_depth,
-#         boundx=1.0,
-#         boundy=1.0,
-#         device=None
-#         ):
-
-#         super().__init__()
-#         self.boundx = boundx
-#         self.boundy = boundy
-#         self.spatial_depth = spatial_depth
-#         self.scale_depth = scale_depth
-#         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu") if device is None else device
-
-#         # Target shape
-#         C, H, W = target_shape
-#         B = 1
-
-#         # Build mesh grid
-#         xs = torch.linspace(-self.boundx, self.boundx, W, device=device)
-#         ys = torch.linspace(-self.boundy, self.boundy, H, device=device)
-#         grid_y, grid_x = torch.meshgrid(ys, xs, indexing='ij')
-
-#         # Reshape for broadcasting
-#         grid_x = grid_x.view(1, 1, 1, H, W)
-#         grid_y = grid_y.view(1, 1, 1, H, W)
-
-#         # Compute tile widths
-#         tile_width_x = 2 * boundx / spatial_depth
-#         tile_width_y = 2 * boundy / spatial_depth
-
-#         # Compute centers of tiles
-#         shifts_x = -boundx + tile_width_x * (0.5 + torch.arange(spatial_depth))
-#         shifts_y = -boundy + tile_width_y * (0.5 + torch.arange(spatial_depth))
-
-#         # Register as buffers
-#         self.register_buffer('shifts_x', shifts_x)
-#         self.register_buffer('shifts_y', shifts_y)
-
-#         # Scale factors along x and y
-#         self.freqs = torch.Tensor([1.0 * 2**(n/2) for n in range(scale_depth)])
-#         scales = 1 / self.freqs
-#         scales_safe = scales.abs().clamp(min=1e-4)
-#         self.register_buffer('inv_scales', (1.0 / scales_safe))
-#         self.register_buffer('scales', scales)
-
-#         S, Sd = self.spatial_depth, self.scale_depth
-#         sx = self.shifts_x.view(S, 1, 1, 1, 1)
-#         sy = self.shifts_y.view(1, S, 1, 1, 1)
-#         isc = self.inv_scales.view(1, 1, Sd, 1, 1)
-
-#         # Vectorized wavelet bank: sine & cosine phases
-#         u = (grid_x - sx) * isc
-#         v = (grid_y - sy) * isc
-#         basis_sin = self.sawtooth_wavepacket_sine_sep(u, v)
-#         basis_cos = self.sawtooth_wavepacket_cosine_sep(u, v)
-#         basis = torch.cat([basis_sin, basis_cos], dim=2)  # (S, S, 2*Sd, H, W)
-
-#         # Learnable parameters: double for sine and cosine phases
-#         self.num_bases = spatial_depth * spatial_depth * scale_depth * 2  # factor 2 for sine & cosine
-#         # self.wavelet_coefficients = nn.Parameter(torch.randn(1, 3, self.num_bases))
-
-#         # Flatten and broadcast
-#         self.basis = basis.reshape(self.num_bases, H, W).unsqueeze(0).expand(B, -1, -1, -1).to(self.device)
-
-#         # Output Activation
-#         self.hls = HardLeakySigmoid(slope=0.01)
-
-#     def num_params(self):
-#         return sum(p.numel() for p in self.parameters() if p.requires_grad)
-
-#     def sawtooth_wavepacket_sine_radial(self, u, v):
-#         N = 12
-#         S = 1
-#         sawtooth = 0
-#         r = torch.sqrt(u**2 + v**2)
-#         for n in range(1, N + 1):
-#             sawtooth = sawtooth + (2/torch.pi) * (((-1)**(n+1))/n) * torch.sin(2*torch.pi*n*r)
-#         env = torch.exp(-0.5 * (r/S)**2)
-#         return sawtooth * env
-
-#     def sawtooth_wavepacket_cosine_radial(self, u, v):
-#         N = 12
-#         S = 1
-#         sawtooth = 0
-#         r = torch.sqrt(u**2 + v**2)
-#         for n in range(1, N + 1):
-#             sawtooth = sawtooth + (2/torch.pi) * (((-1)**(n+1))/n) * torch.sin(2*torch.pi*n*(r + 0.25))
-#         env = torch.exp(-0.5 * (r/S)**2)
-#         return sawtooth * env
-
-#     def sawtooth_wavepacket_sine_sep(self, u, v):
-#         N = 8
-#         S = 1
-#         r = torch.sqrt(u**2 + v**2)
-#         sawtooth_u = 0
-#         sawtooth_v = 0
-#         for n in range(1, N + 1):
-#             sawtooth_u = sawtooth_u + (2/torch.pi) * (((-1)**(n+1))/n) * torch.sin(2*torch.pi*n*u)
-#             sawtooth_v = sawtooth_v + (2/torch.pi) * (((-1)**(n+1))/n) * torch.sin(2*torch.pi*n*v)
-#         env = torch.exp(-0.5 * (r/S)**2)
-#         return sawtooth_u * sawtooth_v * env
-
-#     def sawtooth_wavepacket_cosine_sep(self, u, v):
-#         N = 8
-#         S = 1
-#         r = torch.sqrt(u**2 + v**2)
-#         sawtooth_u = 0
-#         sawtooth_v = 0
-#         for n in range(1, N + 1):
-#             sawtooth_u = sawtooth_u + (2/torch.pi) * (((-1)**(n+1))/n) * torch.sin(2*torch.pi*n*(u + 0.25))
-#             sawtooth_v = sawtooth_v + (2/torch.pi) * (((-1)**(n+1))/n) * torch.sin(2*torch.pi*n*(v + 0.25))
-#         env = torch.exp(-0.5 * (r/S)**2)
-#         return sawtooth_u * sawtooth_v * env
-
-#     # ------------------------------------------------------------------------ #
-#     def forward(self, coeffs) -> torch.Tensor:
-#         B, C, _ = coeffs.shape
-#         with torch.no_grad():
-#             # Synthesize image
-#             out = torch.einsum('bcn, bnhw -> bchw', coeffs, self.basis)
-#             norm = torch.abs(coeffs).sum(dim=2).view(B, C, 1, 1)
-#             # out = out / (norm + 1e-9)
-#             out = self.hls(out)
-#         return out
-
 

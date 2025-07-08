@@ -49,7 +49,7 @@ class Evolver:
             self.start_gen = 1
 
         # Number of learnable parameters
-        self.num_params = self.model.num_params()
+        self.num_params = self.model.num_wavelet_kernels
 
         # Number of pixels in target image
         self.num_pixels = C*H*W
@@ -89,6 +89,16 @@ class Evolver:
             next_pop.append(self.parents[i].clone())
 
         # Crossover + Mutation
+        gen = len(self.history)
+        mut_scale_mult = self.model.mut_scale_mult.clone()
+        mut_scale_mult[(1 + gen // 10000):] = 0
+
+        mut_scale_mult = (
+            mut_scale_mult.repeat(2)
+            .repeat(3, self.model.num_tiles_per_dim, self.model.num_tiles_per_dim, 1)
+            .view(3, -1)
+        )
+
         while len(next_pop) < self.config.pop_size:
             i, j = np.random.choice(self.config.parent_k, size=2, replace=False)
             p1, p2 = self.parents[i], self.parents[j]
@@ -96,11 +106,13 @@ class Evolver:
             child = torch.cat([p1[:, :point], p2[:, point:]], dim=1)
             mask  = (torch.rand_like(child) < self.config.mut_rate).float()
             noise = torch.randn_like(child) * self.config.mut_scale
+            noise = noise * mut_scale_mult
             next_pop.append(child + mask * noise)
 
         self.pop = torch.stack(next_pop, dim=0)
 
-    def analysis(self, gen:int):
+    def analysis(self):
+        gen = len(self.history)
 
         print(f"Gen {gen}/{self.config.generations} | Best MSE: {self.best_mse:.6f}")
 
@@ -110,17 +122,30 @@ class Evolver:
             recon = self.model(best_coeffs).cpu()[0].permute(1, 2, 0).numpy()
             orig  = self.target.cpu().permute(1, 2, 0).numpy()
 
-        self.plot_recon(orig, recon, f"{recons_dir}/evolved_{gen:06d}.png")
+        self.plot_recon(orig, recon, f"{recons_dir}/evolved_{gen:09d}.png")
+
+        self.plot_history(f"{results_dir}/ga_history.png")
 
     def plot_recon(self, orig, recon, path):
-
         fig, ax = plt.subplots(1,2,figsize=(10, 5))
-        ax[0].imshow(orig);  ax[0].set_title("Orig");  ax[0].axis('off')
+        ax[0].imshow(orig);  ax[0].set_title("Orig"); ax[0].axis('off')
         ax[1].imshow(recon); ax[1].set_title("Best"); ax[1].axis('off')
         plt.suptitle(
-            f"Wavelets: {self.config.spatial_depth**2:d} | Freqs/Wavelet: {self.config.scale_depth:d} | Total Params: {self.num_params:d} | Image Dims ({self.target.shape[-3]}, {self.target.shape[-2]}, {self.target.shape[-1]}) | Num Pixels: {self.num_pixels:d} | Ratio: {self.comp_ratio}", fontsize=8)
+            f"Wavelets: {self.config.spatial_depth**2:d} | Freqs/Wavelet: {self.config.scale_depth:d} | Total Params: {self.num_params:d} | Image Dims ({self.target.shape[-3]}, {self.target.shape[-2]}, {self.target.shape[-1]}) | Num Pixels: {self.num_pixels:d} | Ratio: {self.comp_ratio:0.4f}", fontsize=8)
         plt.savefig(path)
         plt.close(fig)
+
+    def plot_history(self, path):
+        fig = plt.figure(figsize=(10, 5))
+        plt.semilogy(
+            np.arange(len(self.history)),
+            self.history
+        )
+        plt.title("GA History")
+        plt.grid("both")
+        plt.savefig(path)
+        plt.close(fig)
+
 
     #     plt.figure()
     #     plt.plot(history)
@@ -190,7 +215,8 @@ if __name__ == "__main__":
 
         # Analysis
         if gen == 1 or gen % evolver.config.analyze_every == 0:
-            evolver.analysis(gen=gen)
+            evolver.analysis()
+
 
 
 
